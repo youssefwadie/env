@@ -6,7 +6,7 @@ The usage looks like this:
 
 ```java
 import com.github.youssefwadie.env.EnvParser;
-import annotations.com.github.youssefwadie.env.Env;
+import com.github.youssefwadie.env.annotations.Env;
 
 import java.util.List;
 

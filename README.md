@@ -45,5 +45,6 @@ public class Runner {
 ### Supported types
 - All primitive types and their respective wrappers
 - String
+- Number is mapped to BigDecimal
 - Object is parsed as a String type
-- List and Set types, with a one of the above types, wild cards are *not supported*.
+- List and Set types, with a one of the above types.

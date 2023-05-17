@@ -16,6 +16,8 @@ public class AppConfig {
 
     @Env(value = "ALLOWED_ORIGINS", separator = ",")
     private List<String> allowedOrigins;
+    @Env(value = "ADMIN_IDS")
+    private List<Integer> adminIds;
 
     public Integer getPort() {
         return port;
@@ -47,6 +49,14 @@ public class AppConfig {
 
     public void setAllowedOrigins(List<String> allowedOrigins) {
         this.allowedOrigins = allowedOrigins;
+    }
+
+    public List<Integer> getAdminIds() {
+        return adminIds;
+    }
+
+    public void setAdminIds(List<Integer> adminIds) {
+        this.adminIds = adminIds;
     }
 
     @Override

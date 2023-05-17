@@ -9,15 +9,15 @@ import org.junit.jupiter.api.Test;
 import java.util.HashMap;
 import java.util.List;
 
-import static com.github.youssefwadie.env.EnvParser.NO_EMPTY_CONSTRUCTOR_FOUND;
+import static com.github.youssefwadie.env.ObjectEnvParser.NO_EMPTY_CONSTRUCTOR_FOUND;
 
-class EnvParserTest {
+class ObjectEnvParserTest {
     private final static String DB_USERNAME = "youssef";
     private final static String DB_PASSWORD = "youssef";
     private final static Integer SERVER_PORT = 10;
     private final static List<String> ALLOWED_ORIGINS = List.of("http://localhost:4200", "https://example.org");
-
-    private EnvParser envParser;
+    private final static List<Integer> ADMIN_IDS = List.of(1, 2, 3);
+    private ObjectEnvParser envParser;
 
 
     @BeforeEach
@@ -27,8 +27,8 @@ class EnvParserTest {
         env.put("SERVER_PORT", String.valueOf(SERVER_PORT));
         env.put("DB_PASSWORD", DB_PASSWORD);
         env.put("ALLOWED_ORIGINS", String.join(",", ALLOWED_ORIGINS));
-
-        envParser = new EnvParser(env);
+        env.put("ADMIN_IDS", String.join(",", ADMIN_IDS.stream().map(String::valueOf).toList()));
+        envParser = new ObjectEnvParser(env);
     }
 
     @Test
@@ -38,6 +38,7 @@ class EnvParserTest {
         Assertions.assertTrue(() -> parsedAppConfig.getDbPassword().equals(DB_PASSWORD));
         Assertions.assertTrue(() -> parsedAppConfig.getDbUsername().equals(DB_USERNAME));
         Assertions.assertTrue(() -> parsedAppConfig.getPort().equals(SERVER_PORT));
+        Assertions.assertTrue(() -> parsedAppConfig.getAdminIds().equals(ADMIN_IDS));
     }
 
     @Test
@@ -48,6 +49,7 @@ class EnvParserTest {
         Assertions.assertTrue(() -> appConfig.getDbPassword().equals(DB_PASSWORD));
         Assertions.assertTrue(() -> appConfig.getDbUsername().equals(DB_USERNAME));
         Assertions.assertTrue(() -> appConfig.getPort().equals(SERVER_PORT));
+        Assertions.assertTrue(() -> appConfig.getAdminIds().equals(ADMIN_IDS));
     }
 
 

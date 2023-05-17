@@ -2,157 +2,107 @@ package com.github.youssefwadie.env;
 
 import com.github.youssefwadie.env.annotations.Env;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
-import java.lang.reflect.InaccessibleObjectException;
 import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.lang.reflect.WildcardType;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.math.BigDecimal;
+import java.util.*;
 import java.util.logging.Logger;
 
 public class EnvParser {
-    public final static String NO_EMPTY_CONSTRUCTOR_FOUND = "no empty constructor found";
+
     public static final String WILD_CARD_TYPE_ARE_NOT_SUPPORTED = "wild card type are not supported";
     public static final String UNSUPPORTED_TYPE = "Type : %s unsupported";
-    public static final String ENV_WAS_NOT_FOUND = "%s env was not found";
-
     private final static Logger log = Logger.getLogger(EnvParser.class.getName());
     private final Map<String, String> environmentVariables;
 
-    /**
-     * Creates an instance with the system environment actual variables
-     */
     public EnvParser() {
         this(System.getenv());
     }
 
-    /**
-     * Creates a parser instance with the given environment variables
-     * @param environmentVariables must not be null.
-     * @throws NullPointerException if the given {@code environmentVariables} is {@code null}.
-     */
     protected EnvParser(Map<String, String> environmentVariables) {
-        Objects.requireNonNull(environmentVariables, "environmentVariables must not be null");
+        Assert.notEmpty(environmentVariables, "environmentVariables cannot be empty");
         this.environmentVariables = environmentVariables;
     }
 
     /**
-     * Parses all the annotated fields in the given instance
+     * Parses the given {@link Env} and returns the parsed instance.
      *
-     * @param instance must not be {@literal null}.
-     * @return the parsed instance
-     * @throws NullPointerException          if the given clazz is null.
-     * @throws UnsupportedOperationException if the given instance in a private module.
-     * @throws InaccessibleObjectException   if the instance has an annotated field with wild card generic type.
-     *                                       <h3>all the thrown exceptions are wrapped in a {@link RuntimeException}</h3>
+     * @param env         the {@link Env} object to parse, must not be {@literal null}.
+     * @param resultClass the class representing the desired environment variable type.
+     * @return the parsed instance of the specified type.
+     * @throws IllegalArgumentException if the {@code env} or {@code resultClass} is null.
+     * @throws RuntimeException         if any other exception occurs during the parsing process.
+     *                                  The specific exception that occurred will be wrapped in this {@code RuntimeException}.
      */
-    public <T> T parse(T instance) {
-        Objects.requireNonNull(instance, "instance cannot be null");
-        List<Field> annotatedFields = getAnnotatedFields(instance);
-        Map<Field, String> fieldToEnv = getFieldToEnv(annotatedFields);
+    @SuppressWarnings("unchecked")
+    public <T> T parse(Env env, Class<T> resultClass) {
+        Assert.notNull(env, "env must not be null");
+        Assert.hasText(env.value(), "env.value() cannot be empty");
+
+        final var envValue = environmentVariables.get(env.value());
+
         try {
-            return populate(instance, fieldToEnv);
+            final var separator = env.separator();
+            if (resultClass.equals(List.class)) {
+                return (T) parseList(String.class, envValue, separator);
+            } else if (resultClass.equals(Set.class)) {
+                return (T) parseSet(String.class, envValue, separator);
+            } else {
+                return (T) parseValue(resultClass, envValue);
+            }
         } catch (Throwable t) {
-            throw new RuntimeException(t);
+            // TODO handle silence fail
+            log.severe(t.getMessage());
         }
+        return null;
     }
 
-
     /**
-     * Creates an instance of the given class
+     * Parses the given {@link Env} and returns the parsed instance.
+     * <p>
+     * Convenient method to word with fields and method return types
+     * </p>
      *
-     * @param clazz the class type, must not be {@literal null}.
-     * @return the instantiated instance
-     * @throws NullPointerException          if the given clazz is null.
-     * @throws IllegalStateException         if the given clazz has no default (empty) constructor.
-     * @throws UnsupportedOperationException if the given instance in a private module.
-     * @throws InaccessibleObjectException   if the instance has an annotated field with wild card generic type.
-     *                                       <h3>all the thrown exceptions are wrapped in a {@link RuntimeException}</h3>
+     * @param env        the {@link Env} object to parse, must not be {@literal null}.
+     * @param targetType the class representing the desired environment variable type.
+     * @return the parsed instance of the specified type.
+     * @throws IllegalArgumentException if the {@code env} or {@code resultClass} is null.
+     * @throws RuntimeException         if any other exception occurs during the parsing process.
+     *                                  The specific exception that occurred will be wrapped in this {@code RuntimeException}.
      */
-    public <T> T parse(Class<T> clazz) {
-        Objects.requireNonNull(clazz, "clazz cannot be null");
+    @SuppressWarnings("unchecked")
+    public <T> T parse(Env env, Type targetType) {
+        Assert.notNull(env, "env must not be null");
+        Assert.hasText(env.value(), "env.value() cannot be empty");
+        final var envValue = environmentVariables.get(env.value());
         try {
-            final var emptyConstructor = getEmptyConstructor(clazz);
-            if (emptyConstructor == null) {
-                throw new IllegalStateException(NO_EMPTY_CONSTRUCTOR_FOUND);
+            final var separator = env.separator();
+
+            if (targetType instanceof Class<?> targetClass) {
+                return (T) parse(env, targetClass);
             }
-            final T instance = emptyConstructor.newInstance();
-            return parse(instance);
+
+            if (!(targetType instanceof ParameterizedType parameterizedType)) {
+                return null;
+            }
+
+            final var rawType = parameterizedType.getRawType();
+            if (rawType.equals(List.class)) {
+                return (T) parseList(parameterizedType, envValue, separator);
+            } else if (rawType.equals(Set.class)) {
+                return (T) parseSet(parameterizedType, envValue, separator);
+            } else {
+                return (T) parseValue(rawType.getClass(), envValue);
+            }
+
         } catch (Throwable t) {
-            throw new RuntimeException(t);
+            // TODO handle silence fail
+            log.severe(t.getMessage());
         }
+        return null;
     }
 
-    /**
-     * Creates a {@link Map} with all the fields as its keys, and the {@link Env#value()} as its value
-     *
-     * @param annotatedFields a list of the annotated fields
-     * @return the constructed {@link Map}.
-     */
-    private Map<Field, String> getFieldToEnv(final List<Field> annotatedFields) {
-        Map<Field, String> fieldToEnv = new HashMap<>();
-        for (Field annotatedField : annotatedFields) {
-            Env annotation = annotatedField.getAnnotation(Env.class);
-            String declaredEnvValue = annotation.value();
-            String env = environmentVariables.get(declaredEnvValue);
-            if (env == null) {
-                log.warning(String.format(ENV_WAS_NOT_FOUND, declaredEnvValue));
-            }
-            fieldToEnv.put(annotatedField, env);
-        }
-        return fieldToEnv;
-    }
-
-    /**
-     * Returns the empty constructor of the given clazz
-     *
-     * @param clazz the class type
-     * @return the empty constructor if found, {@literal null} if not found.
-     */
-    private <T> Constructor<T> getEmptyConstructor(Class<T> clazz) {
-        try {
-            return clazz.getDeclaredConstructor();
-        } catch (NoSuchMethodException ex) {
-            return null;
-        }
-    }
-
-    /**
-     * Populates the given instance with the values in the fieldToEnv map.
-     *
-     * @param instance   the object instance
-     * @param fieldToEnv mapping from field to {@link Env#value()}
-     * @return the populated instance.
-     */
-    private <T> T populate(T instance, Map<Field, String> fieldToEnv) {
-        for (var fieldObjectEntry : fieldToEnv.entrySet()) {
-            final var field = fieldObjectEntry.getKey();
-            field.setAccessible(true);
-            try {
-                final var separator = field.getAnnotation(Env.class).separator();
-                if (field.getType().equals(List.class)) {
-                    field.set(instance, parseList(field, fieldObjectEntry.getValue(), separator));
-                } else if (field.getType().equals(Set.class)) {
-                    field.set(instance, parseSet(field, fieldObjectEntry.getValue(), separator));
-                } else {
-                    field.set(instance, parseValue(field.getType(), fieldObjectEntry.getValue()));
-                }
-            } catch (Throwable t) {
-                // TODO handle silence fail
-                log.severe(t.getMessage());
-            }
-        }
-
-        return instance;
-    }
 
     /**
      * Parses a primitive type from the given value string
@@ -177,6 +127,8 @@ public class EnvParser {
             return value;
         } else if (type.equals(Object.class)) {
             return value;
+        } else if (type.equals(Number.class)) {
+            return new BigDecimal(value);
         }
         throw new IllegalStateException(String.format(UNSUPPORTED_TYPE, type.getTypeName()));
     }
@@ -184,35 +136,60 @@ public class EnvParser {
     /**
      * Parses a set type from the given String value
      *
-     * @param field     a field of {@link Set} type
+     * @param type      a type of {@link Set} type
      * @param value     the String representation of the Set elements
      * @param separator the string separator of the elements
      * @return Object of type Set
      * @throws Throwable if the instantiation of the {@link LinkedHashSet} failed for some reason.
      */
-    @SuppressWarnings("unchecked")
-    private Object parseSet(Field field, String value, String separator) throws Throwable {
-        final String[] parts = split(value, separator);
-        final var elementType = getGenericType(field);
-
-        final var objects = (Set<Object>) LinkedHashSet.class.getDeclaredConstructor().newInstance();
-        return parseCollection(elementType, objects, parts);
+    private Object parseSet(Type type, String value, String separator) throws Throwable {
+        final var elementType = getGenericType(type);
+        return parseSet(elementType, value, separator);
     }
 
     /**
      * Parses a set type from the given String value
      *
-     * @param field     a field of {@link List} type
+     * @param elementType elementType class
+     * @param value       the String representation of the List elements
+     * @param separator   the string separator of the elements
+     * @return Object of type List
+     * @throws Throwable if the instantiation of the {@link ArrayList} failed for some reason.
+     */
+    @SuppressWarnings("unchecked")
+    private <E> Object parseSet(Class<E> elementType, String value, String separator) throws Throwable {
+        final var parts = split(value, separator);
+        final var set = (List<Object>) LinkedHashSet.class.getDeclaredConstructor().newInstance();
+        return parseCollection(elementType, set, parts);
+    }
+
+    /**
+     * Parses a set type from the given String value
+     *
+     * @param type      a field of {@link List} type
      * @param value     the String representation of the List elements
      * @param separator the string separator of the elements
      * @return Object of type List
      * @throws Throwable if the instantiation of the {@link ArrayList} failed for some reason.
      */
-    @SuppressWarnings("unchecked")
-    private Object parseList(Field field, String value, String separator) throws Throwable {
-        final var parts = split(value, separator);
-        final var elementType = getGenericType(field);
+    private Object parseList(Type type, String value, String separator) throws Throwable {
+        final var elementType = getGenericType(type);
+        return parseList(elementType, value, separator);
+    }
 
+
+    /**
+     * Parses a set type from the given String value
+     *
+     * @param elementType elementType class
+     * @param value       the String representation of the List elements
+     * @param separator   the string separator of the elements
+     * @return Object of type List
+     * @throws Throwable if the instantiation of the {@link ArrayList} failed for some reason.
+     */
+    @SuppressWarnings("unchecked")
+    private <E> Object parseList(Class<E> elementType, String value, String separator) throws Throwable {
+        final var parts = split(value, separator);
         final var list = (List<Object>) ArrayList.class.getDeclaredConstructor().newInstance();
         return parseCollection(elementType, list, parts);
     }
@@ -225,31 +202,33 @@ public class EnvParser {
      * @param parts       the string parts represents the collection elements
      * @return the populated collection
      */
-    private Object parseCollection(Class<?> elementType, Collection<Object> collection, String[] parts) {
+    @SuppressWarnings("unchecked")
+    private <T> Collection<T> parseCollection(Class<?> elementType, Collection<Object> collection, String[] parts) {
         for (final var part : parts) {
             collection.add(parseValue(elementType, part));
         }
-        return collection;
+        return (Collection<T>) collection;
     }
 
-    /**
-     * Gets the generic type of parameterized (generic) field
-     *
-     * @param field the parametrized field.
-     * @return the class of the genericType.
-     */
-    private static Class<?> getGenericType(Field field) {
-        try {
-            final var genericType = (ParameterizedType) field.getGenericType();
-            final var genericTypeArg = genericType.getActualTypeArguments()[0];
-            if (genericTypeArg instanceof WildcardType) {
-                throw new UnsupportedOperationException(WILD_CARD_TYPE_ARE_NOT_SUPPORTED);
-            }
-            return (Class<?>) genericTypeArg;
-        } catch (ClassCastException e) {
-            log.warning(String.format("%s Raw use of parameterized class '%s'", field.getName(), field.getType().getSimpleName()));
+    public static Class<?> getGenericType(Type type) {
+        if (!(type instanceof ParameterizedType parameterizedType)) {
             return Object.class;
         }
+
+        final var genericTypeArg = parameterizedType.getActualTypeArguments()[0];
+
+        if (!(genericTypeArg instanceof WildcardType wildcardType)) {
+            return (Class<?>) genericTypeArg;
+        }
+
+        Type[] upperBounds = wildcardType.getUpperBounds();
+
+        if (upperBounds.length != 1) {
+            throw new UnsupportedOperationException(WILD_CARD_TYPE_ARE_NOT_SUPPORTED);
+        }
+
+        return (Class<?>) upperBounds[0];
+
     }
 
     /**
@@ -264,15 +243,4 @@ public class EnvParser {
         return value.split(separator);
     }
 
-    /**
-     * Gets the annotated fields with {@link Env} of the given instance
-     *
-     * @param instance not-null instance
-     * @return a list of all annotated fields
-     */
-    private List<Field> getAnnotatedFields(Object instance) {
-        return Arrays.stream(instance.getClass().getDeclaredFields())
-                .filter(field -> field.isAnnotationPresent(Env.class))
-                .toList();
-    }
 }

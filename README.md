@@ -54,5 +54,5 @@ public class ApplicationRunner {
 - All primitive types and their respective wrappers
 - String
 - java.lang.Number is parsed as java.math.BigDecimal
-- java.lang.Object is parsed as a java.lang.String type
+- java.lang.Object is parsed as java.lang.String
 - List and Set types, with a one of the above types.

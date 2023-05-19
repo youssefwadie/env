@@ -28,10 +28,11 @@ public class EnvProxyFactory {
         if (!interfaceClass.isInterface()) {
             throw new IllegalArgumentException("interfaceClass must be an interface class");
         }
-        ClassLoader classLoader = interfaceClass.getClassLoader();
         Map<String, Object> metaData = collectMetaData(interfaceClass);
         InvocationHandler envValueInvocationHandler = new EnvValueInvocationHandler(metaData);
-        return (T) Proxy.newProxyInstance(classLoader, new Class[]{interfaceClass}, envValueInvocationHandler);
+        return (T) Proxy.newProxyInstance(interfaceClass.getClassLoader(),
+                new Class[]{interfaceClass},
+                envValueInvocationHandler);
     }
 
     private Map<String, Object> collectMetaData(Class<?> interfaceClass) {

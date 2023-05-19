@@ -19,6 +19,7 @@ public final class Assert {
         }
     }
 
+
     public static void notEmpty(Map<?, ?> map, String message) {
         if (map == null || map.isEmpty()) {
             throw new IllegalArgumentException(message);
@@ -27,7 +28,7 @@ public final class Assert {
 
     public static void hasText(String str, String message) {
         if (str == null || str.isBlank()) {
-           throw new IllegalArgumentException(message);
+            throw new IllegalArgumentException(message);
         }
     }
 }

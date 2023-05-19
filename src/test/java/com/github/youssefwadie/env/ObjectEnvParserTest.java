@@ -1,5 +1,6 @@
 package com.github.youssefwadie.env;
 
+import com.github.youssefwadie.env.exceptions.NoArgsConstructorNotFoundException;
 import com.github.youssefwadie.env.model.AdvancedAppConfig;
 import com.github.youssefwadie.env.model.AppConfig;
 import org.junit.jupiter.api.Assertions;
@@ -9,7 +10,7 @@ import org.junit.jupiter.api.Test;
 import java.util.HashMap;
 import java.util.List;
 
-import static com.github.youssefwadie.env.ObjectEnvParser.NO_EMPTY_CONSTRUCTOR_FOUND;
+import static com.github.youssefwadie.env.exceptions.NoArgsConstructorNotFoundException.NO_EMPTY_CONSTRUCTOR_FOUND_MSG;
 
 class ObjectEnvParserTest {
     private final static String DB_USERNAME = "youssef";
@@ -28,7 +29,7 @@ class ObjectEnvParserTest {
         env.put("DB_PASSWORD", DB_PASSWORD);
         env.put("ALLOWED_ORIGINS", String.join(",", ALLOWED_ORIGINS));
         env.put("ADMIN_IDS", String.join(",", ADMIN_IDS.stream().map(String::valueOf).toList()));
-        envParser = new ObjectEnvParser(env);
+        envParser = new ObjectEnvParser(env, true);
     }
 
     @Test
@@ -56,8 +57,8 @@ class ObjectEnvParserTest {
     @Test
     void parseWithClass_WhenNoEmptyConstructorFound() {
         RuntimeException runtimeException = Assertions.assertThrows(RuntimeException.class, () -> envParser.parse(AdvancedAppConfig.class));
-        Assertions.assertEquals(runtimeException.getCause().getClass(), IllegalStateException.class);
-        Assertions.assertEquals(runtimeException.getCause().getMessage(), NO_EMPTY_CONSTRUCTOR_FOUND);
+        Assertions.assertEquals(runtimeException.getCause().getClass(), NoArgsConstructorNotFoundException.class);
+        Assertions.assertEquals(runtimeException.getCause().getMessage(), NO_EMPTY_CONSTRUCTOR_FOUND_MSG);
     }
 
 }

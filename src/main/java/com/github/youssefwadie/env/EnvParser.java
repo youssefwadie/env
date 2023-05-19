@@ -1,6 +1,7 @@
 package com.github.youssefwadie.env;
 
 import com.github.youssefwadie.env.annotations.Env;
+import com.github.youssefwadie.env.exceptions.UnsupportedTypeException;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -12,7 +13,6 @@ import java.util.logging.Logger;
 public class EnvParser {
 
     public static final String WILD_CARD_TYPE_ARE_NOT_SUPPORTED = "wild card type are not supported";
-    public static final String UNSUPPORTED_TYPE = "Type : %s unsupported";
     private final static Logger log = Logger.getLogger(EnvParser.class.getName());
     private final Map<String, String> environmentVariables;
 
@@ -130,7 +130,7 @@ public class EnvParser {
         } else if (type.equals(Number.class)) {
             return new BigDecimal(value);
         }
-        throw new IllegalStateException(String.format(UNSUPPORTED_TYPE, type.getTypeName()));
+        throw new UnsupportedTypeException(type.getTypeName());
     }
 
     /**
@@ -210,7 +210,7 @@ public class EnvParser {
         return (Collection<T>) collection;
     }
 
-    public static Class<?> getGenericType(Type type) {
+    private Class<?> getGenericType(Type type) {
         if (!(type instanceof ParameterizedType parameterizedType)) {
             return Object.class;
         }
